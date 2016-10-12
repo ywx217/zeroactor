@@ -6,6 +6,17 @@ def _destroy_socket(sock):
 	sock.close()
 
 
+def _recv_from_socket(socket, max_per_poll):
+	# no block receive from a zmq socket
+	try:
+		for _ in xrange(max_per_poll):
+			msg_parts = socket.recv_multipart(zmq.NOBLOCK)
+			yield msg_parts
+	except zmq.ZMQError:
+		# no more msg
+		pass
+
+
 class ZeroGate(object):
 	"""
 	Do both send to and recv from another zero gate.
@@ -66,17 +77,6 @@ class ZeroGate(object):
 	def send(self, target_socket, payload):
 		# send payload to the target socket
 		raise NotImplementedError
-
-
-def _recv_from_socket(socket, max_per_poll):
-	# no block receive from a zmq socket
-	try:
-		for _ in xrange(max_per_poll):
-			msg_parts = socket.recv_multipart(zmq.NOBLOCK)
-			yield msg_parts
-	except zmq.ZMQError:
-		# no more msg
-		pass
 
 
 class DealerRouterGate(ZeroGate):
