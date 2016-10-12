@@ -1,4 +1,4 @@
-import gate
+from zeroactor import gate
 import random
 import collections
 import unittest
