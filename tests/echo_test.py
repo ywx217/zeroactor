@@ -100,9 +100,9 @@ class EchoTest(unittest.TestCase):
 		)
 		for idx, s in enumerate(self._servers):
 			if idx < n:
-				self.assertEqual(n_send, s.recv_len, '%d-%s' % (idx, s))
+				self.assertEqual(n_send, s.recv_len, '%d-%s: %s!=%s' % (idx, s, n_send, s.recv_len))
 			else:
-				self.assertEqual(n * n_send, s.recv_len, '%d-%s' % (idx, s))
+				self.assertEqual(n * n_send, s.recv_len, '%d-%s: %s!=%s' % (idx, s, n * n_send, s.recv_len))
 
 	def testRingSend(self):
 		n = 10
