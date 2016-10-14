@@ -136,7 +136,7 @@ class DealerRouterGate(ZeroGate):
 				self._dispatch_recv(msg_parts)
 		for socket, event in sockets.iteritems():
 			# client recv
-			if sockets == self._server_socket or event != zmq.POLLIN:
+			if socket == self._server_socket or event != zmq.POLLIN:
 				continue
 			# dump all msg received by client socket
 			filter(None, _recv_from_socket(socket, self._max_per_poll))
