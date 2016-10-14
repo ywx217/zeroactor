@@ -1,4 +1,5 @@
 import zmq
+import time
 
 
 def _destroy_socket(sock):
@@ -81,7 +82,7 @@ class ZeroGate(object):
 
 class DealerRouterGate(ZeroGate):
 	"""
-	zeromq rpc gateway based on dealer and router
+	ZeroMQ rpc gateway based on dealer to router connection
 	"""
 
 	def _create_server_socket(self):
@@ -146,3 +147,63 @@ class DealerRouterGate(ZeroGate):
 		if not target_socket:
 			return
 		target_socket.send_multipart([self._connect_addr, 'RPC', payload])
+
+
+class RouterRouterGate(ZeroGate):
+	"""
+	ZeroMQ rpc gateway based on router to router connect
+	"""
+
+	def __init__(self, ip, port, max_per_poll=100):
+		super(RouterRouterGate, self).__init__(ip, port, max_per_poll)
+		self._client_init_time = {}
+
+	def _create_server_socket(self):
+		sock = self._context.socket(zmq.ROUTER)
+		sock.setsockopt(zmq.IDENTITY, self._connect_addr)
+		sock.bind(self._bind_addr)
+		self._poller.register(sock, zmq.POLLIN)
+		return sock
+
+	def _get_client_socket(self, target_socket_addr, auto_create=True):
+		if self._client_init_time.get(target_socket_addr):
+			return self._server_socket
+		if not auto_create:
+			return None
+		self._server_socket.connect(target_socket_addr)
+		self._client_init_time[target_socket_addr] = time.time()
+		return self._server_socket
+
+	def connect(self, target_socket_addr):
+		self._get_client_socket(target_socket_addr)
+
+	def _dispatch_recv(self, msg_parts):
+		if len(msg_parts) < 4:
+			return
+		identity, addr, control, payload = msg_parts[:4]
+		if control == 'RPC':
+			self._dispatch_rpc(addr, payload)
+		else:
+			pass
+
+	def _dispatch_rpc(self, source_addr, payload):
+		raise NotImplementedError
+
+	def poll(self, timeout_millisecond=1):
+		sockets = dict(self._poller.poll(max(timeout_millisecond, 0)))
+		if not sockets:
+			# no socket has data to receive
+			return
+		if sockets.get(self._server_socket) == zmq.POLLIN:
+			# server recv
+			for msg_parts in _recv_from_socket(self._server_socket, self._max_per_poll):
+				self._dispatch_recv(msg_parts)
+
+	def _send(self, target_addr, action, payload):
+		target_socket = self._get_client_socket(target_addr)
+		if not target_socket:
+			return
+		target_socket.send_multipart([target_addr, self._connect_addr, action, payload])
+
+	def send(self, target_socket_addr, payload):
+		self._send(target_socket_addr, 'RPC', payload)

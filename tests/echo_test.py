@@ -37,7 +37,7 @@ class EchoTest(unittest.TestCase):
 	def _init_servers(self, iter_serv_clazz):
 		# initialize servers using the given classes
 		self._destroy_servers()
-		base_port = random.randint(10000, 20000)
+		base_port = random.randint(10000, 40000)
 		self._servers = [
 			clazz('127.0.0.1', base_port + idx) for idx, clazz in enumerate(iter_serv_clazz)
 			]
@@ -46,9 +46,17 @@ class EchoTest(unittest.TestCase):
 	def _conn_addr(self, server_idx):
 		return self._servers[server_idx].connect_addr
 
+	def _record_server_class(self):
+		return RecordServer
+
+	def _echo_server_class(self):
+		return EchoServer
+
 	def _poll_all(self, timeout=1):
+		import time
 		for s in self._servers:
-			s.poll(timeout)
+			s.poll(0)
+		time.sleep(timeout * 0.001)
 
 	def _poll_n_times(self, n, timeout=1):
 		for _ in xrange(n):
@@ -73,19 +81,19 @@ class EchoTest(unittest.TestCase):
 	def testEchoSingleSend(self):
 		n_send = 3
 		self._testSend(
-			(RecordServer, EchoServer),
+			(self._record_server_class(), self._echo_server_class()),
 			lambda: self._send(((0, 1),), n_send=n_send),
 			lambda: self._poll_n_times(10)
 		)
 		for idx, s in enumerate(self._servers):
-			self.assertEqual(n_send, s.recv_len, '%d-%s' % (idx, s))
+			self.assertEqual(n_send, s.recv_len, '%d-%s %s!=%s' % (idx, s, n_send, s.recv_len))
 
 	def testEchoDoubleSideSend(self):
 		n_send = 3
 		self._testSend(
-			(RecordServer, EchoServer),
+			(self._record_server_class(), self._echo_server_class()),
 			lambda: self._send(((0, 1), (1, 0)), n_send=n_send),
-			lambda: self._poll_n_times(10)
+			lambda: self._poll_n_times(20)
 		)
 		self.assertEqual(2 * n_send, self._servers[0].recv_len)
 		self.assertEqual(n_send, self._servers[1].recv_len)
@@ -94,7 +102,7 @@ class EchoTest(unittest.TestCase):
 		n = 10
 		n_send = 3
 		self._testSend(
-			(RecordServer,) * n + (EchoServer,),
+			(self._record_server_class(),) * n + (self._echo_server_class(),),
 			lambda: self._send(zip(range(n), (n,) * n), n_send=n_send),
 			lambda: self._poll_n_times(10)
 		)
@@ -113,7 +121,7 @@ class EchoTest(unittest.TestCase):
 				yield x, (x + 1) % n
 
 		self._testSend(
-			(RecordServer,) * n,
+			(self._record_server_class(),) * n,
 			lambda: self._send(ring_iterable(), n_send=n_send),
 			lambda: self._poll_n_times(10)
 		)
@@ -132,7 +140,7 @@ class EchoTest(unittest.TestCase):
 					yield x, y
 
 		self._testSend(
-			(RecordServer,) * n,
+			(self._record_server_class(),) * n,
 			lambda: self._send(star_iterable(), n_send=n_send),
 			lambda: self._poll_n_times(10, 10)
 		)
