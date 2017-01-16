@@ -44,8 +44,11 @@ class RREchoTest(echo_test.EchoTest):
 
 	def _send(self, iter_from_to_idx, msg_or_func='hello world', n_send=1):
 		from_to = list(iter_from_to_idx)
-		self._connect_to_each_other(from_to)
+		# self._connect_to_each_other(from_to)
 		for _ in xrange(n_send):
 			for from_idx, to_idx in from_to:
 				msg = msg_or_func if isinstance(msg_or_func, basestring) else msg_or_func(from_idx, to_idx)
 				self._servers[from_idx].send(self._conn_addr(to_idx), msg)
+				if self._servers[from_idx].get_queue_size():
+					self._servers[from_idx].poll(1)
+					self._servers[to_idx].poll(1)

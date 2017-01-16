@@ -161,6 +161,9 @@ class RouterRouterGate(ZeroGate):
 		self._conn_init_time = conn_init_time * 0.001
 		self._send_queue = collections.defaultdict(collections.deque)
 
+	def get_queue_size(self):
+		return sum(map(len, self._send_queue.itervalues()))
+
 	def _create_server_socket(self):
 		sock = self._context.socket(zmq.ROUTER)
 		sock.setsockopt(zmq.IDENTITY, self._connect_addr)
