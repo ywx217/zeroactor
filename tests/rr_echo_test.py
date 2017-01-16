@@ -5,7 +5,7 @@ import echo_test
 
 class RecordServer(gate.RouterRouterGate):
 	def __init__(self, ip, port, max_per_poll=10):
-		super(RecordServer, self).__init__(ip, port, max_per_poll)
+		super(RecordServer, self).__init__(ip, port, max_per_poll, 5)
 		self._recv_queue = collections.deque()
 
 	def _dispatch_rpc(self, source_addr, payload):

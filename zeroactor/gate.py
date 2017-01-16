@@ -1,5 +1,6 @@
 import zmq
 import time
+import collections
 
 
 def _destroy_socket(sock):
@@ -154,9 +155,11 @@ class RouterRouterGate(ZeroGate):
 	ZeroMQ rpc gateway based on router to router connect
 	"""
 
-	def __init__(self, ip, port, max_per_poll=100):
+	def __init__(self, ip, port, max_per_poll=100, conn_init_time=100):
 		super(RouterRouterGate, self).__init__(ip, port, max_per_poll)
 		self._client_init_time = {}
+		self._conn_init_time = conn_init_time * 0.001
+		self._send_queue = collections.defaultdict(collections.deque)
 
 	def _create_server_socket(self):
 		sock = self._context.socket(zmq.ROUTER)
@@ -190,6 +193,7 @@ class RouterRouterGate(ZeroGate):
 		raise NotImplementedError
 
 	def poll(self, timeout_millisecond=1):
+		self._flush_buffers()
 		sockets = dict(self._poller.poll(max(timeout_millisecond, 0)))
 		if not sockets:
 			# no socket has data to receive
@@ -199,11 +203,24 @@ class RouterRouterGate(ZeroGate):
 			for msg_parts in _recv_from_socket(self._server_socket, self._max_per_poll):
 				self._dispatch_recv(msg_parts)
 
+	def _flush_buffers(self):
+		now = time.time()
+		for target_addr, q in self._send_queue.items():
+			if now - self._client_init_time.get(target_addr, 0) <= self._conn_init_time:
+				continue
+			for action, payload in q:
+				self._send(target_addr, action, payload)
+			del self._send_queue[target_addr]
+
 	def _send(self, target_addr, action, payload):
 		target_socket = self._get_client_socket(target_addr)
 		if not target_socket:
 			return
-		target_socket.send_multipart([target_addr, self._connect_addr, action, payload])
+		if time.time() - self._client_init_time[target_addr] > self._conn_init_time:
+			# direct send
+			target_socket.send_multipart([target_addr, self._connect_addr, action, payload])
+		else:
+			self._send_queue[target_addr].append((action, payload))
 
 	def send(self, target_socket_addr, payload):
 		self._send(target_socket_addr, 'RPC', payload)
